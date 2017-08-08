@@ -10,7 +10,7 @@ function getFileList(folder, extention, callback) {
     callback(d);
   })
   .fail(function() {
-    callback("fail");
+    callback("Fail");
   });
 }
 
@@ -26,7 +26,7 @@ function getMarkDownFile(file, callback) {
     callback(d);
   })
   .fail(function() {
-    callback("fail");
+    callback("Fail");
   });
 }
 
@@ -43,4 +43,28 @@ function getCodeFile(url, callback) {
   .fail(function() {
     callback("Failed to get code from "+url);
   });
+}
+
+
+function checkIframeUrl(url, callback) {
+  $.ajax({
+    type: "POST",
+    url: "ajax/checkCrossOrigin.php",
+    data: { url: url }
+  })
+  .done(function(d) {
+    callback( d );
+  })
+  .fail(function() {
+    callback("Fail");
+  });
+
+//   $.getJSON("/path/to/script.php?url="+url_variable, function (data) {
+//    if (data.error) { 
+//       // code to display pop-up
+//    } else { 
+//       // code to display iframe
+//    }
+// });
+
 }

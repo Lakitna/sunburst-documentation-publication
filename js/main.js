@@ -21,6 +21,7 @@ var p = {
     sel: "#modal-iframe"
   },
   idleTime: {
+    active: true,               // Active idleTimer
     lim: 15,                    // Reset time in minutes
     cur: 0                      // Current idle time in minutes
   }
@@ -44,6 +45,7 @@ var iziConfig = {
     timeout: true
 }
 
+// Highlight settings
 hljs.configure({
   tabReplace: '  '
 })
@@ -52,6 +54,7 @@ hljs.configure({
 var d3d;
 
 
+// On document load
 $(document).ready(function() {
   $(p.nav.sel).height( $(window).height() );
 
@@ -74,6 +77,26 @@ $(document).ready(function() {
 
   idleTimeInit();
 });
+
+
+
+// On modal open
+$(document).on('opened', p.modal.sel, function (e) {
+  var elem = $(this).children('div').children('div').children('iframe');
+  var url = elem.attr("src")
+
+  checkIframeUrl(url, function(d) {
+    d = $.parseJSON(d);
+
+    if (d.error)
+      elem.attr("src", "ajax/crossOriginError.php?url="+url);
+  });
+});
+
+
+
+
+
 
 
 // Setup functions
@@ -313,7 +336,16 @@ function articleUpdate(index) {
     // Catch external links to modal
     $("a[href^=http]").click(function(event) {
       event.preventDefault();
+
       $(p.modal.sel).iziModal('open', event);
+      // checkIframeUrl( $(event.target).attr("href"), function(d) {
+      //   console.log(d);
+
+      //   if (d.error)
+      //     $(p.modal.sel).iziModal('open');
+      //   else
+      //     $(p.modal.sel).iziModal('open', event);
+      // });
     });
 
     // Catch internal links
@@ -397,13 +429,16 @@ function getHTMLFileList(path) {
 // Auto reset functions
 /////////////////////////
 function idleTimeInit() {
-  //Increment the idle time counter every minute.
-  var idleInterval = setInterval(idleTimeIncrement, 60000); // Every minute
+  // Only activate if settings dicate so
+  if (p.idleTime.active) {
+    //Increment the idle time counter every minute.
+    var idleInterval = setInterval(idleTimeIncrement, 60000); // Every minute
 
-  //Zero the idle timer on mouse movement.
-  $(this).mousemove(function (e) { p.idleTime.cur = 0; });
-  $(this).mousedown(function (e) { p.idleTime.cur = 0; });
-  $(this).keypress (function (e) { p.idleTime.cur = 0; });
+    //Zero the idle timer on mouse movement.
+    $(this).mousemove(function (e) { p.idleTime.cur = 0; });
+    $(this).mousedown(function (e) { p.idleTime.cur = 0; });
+    $(this).keypress (function (e) { p.idleTime.cur = 0; });
+  }
 }
 
 function idleTimeIncrement() {
