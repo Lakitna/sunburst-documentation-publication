@@ -1,0 +1,160 @@
+@import reset
+@import markdown
+
+
+
+
+path
+	stroke: #fff
+
+.flexWrapper
+	display: flex
+	flex-wrap: nowrap
+	// align-content: stretch
+	// justify-content: stretch
+
+
+.iziModal .iziModal-iframe
+	z-index: 999
+
+
+nav
+	height: 100%
+	display: block
+	position: relative
+	width: 35%
+
+	svg
+		position: fixed
+		width: 90%
+		z-index: 10
+
+		path
+			cursor: pointer
+			z-index: 15
+
+			&.selfNamed
+				display: none
+				*
+					display: none
+
+			&.txtPath
+				fill: none
+				stroke: none
+
+			&.current
+				fill: rgba(0,0,0,1) !important
+
+			&.root
+				fill: grey !important
+				// fill: url(#pattern) !important
+
+		text
+			z-index: 20
+
+			&.current
+				fill: rgba(255,255,255,1)
+				// font-size: 1.5em
+				// letter-spacing: 100px
+
+			textPath
+				baseline-shift: -1.0em
+				letter-spacing: 1px
+				word-break: keep-all
+				word-wrap: normal
+				overflow: hidden
+				pointer-events: none
+
+				&.overset
+					fill: red
+					overflow-wrap: normal
+
+				&.current
+					fill: rgba(255,255,255,.5)
+
+
+	#breadcrumbs
+		position: fixed
+		z-index: 30
+		background: white
+		padding: .25rem .5rem .4rem .5rem
+		border-radius: 0 0 .5rem 0
+
+		span
+			cursor: pointer
+
+			&.devider
+				margin: 0 .4rem
+				font-size: .5em
+				color: red
+				vertical-align: middle
+				cursor: default
+
+	ul
+		margin: 10px 0 0 20px
+
+		p
+			cursor: pointer
+
+		li
+			margin: 0 0 0 20px
+			cursor: pointer
+
+			&.hidden
+				color: #f00
+				display: none
+
+			&.current
+				color: rgba(0,0,0,.2)
+
+
+.articleWrapper
+	height: 100%
+	position: relative
+	width: 50%
+	z-index: 25
+
+	article
+		margin: 5rem 0 10rem 0
+
+		.fileList
+			padding: 0
+			border-radius: .5rem
+			overflow: hidden
+			margin: 2rem auto
+			border: .1rem solid lightgrey
+
+			&:before
+				content: "Onderwerpen"
+				color: white
+				background: grey
+				padding: .7rem 1rem
+				display: block
+
+			li
+				list-style: none
+				padding: .7rem 1rem
+				cursor: pointer
+				background: rgba(0,0,0,.025) url("../images/icons/navigate_next.svg") no-repeat 98% 50%
+				border-top: .1rem solid white
+				margin: 0
+
+				&:hover
+					background-color: none
+					font-weight: bold
+
+
+a[href^="http"]
+	display: inline-block
+
+	&:after
+		content: "\25F9"
+		vertical-align: super
+		font-size: .6em
+		text-decoration: none
+		text-decoration-color: white
+		display: inline-block
+
+	&:hover:after
+		color: red
+
