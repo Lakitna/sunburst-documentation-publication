@@ -1,15 +1,29 @@
+// To do:
+/////////////////////
+// Add permalinks
+// Add history
+//
+/////////////////////
+// Written by Lakitna 2017
+// Code released via Github https://github.com/Lakitna/sunburst-documentation-publication
+// MIT License
+//
+
 var p = {
   file: {
     index: {},                  // The file index links file ID as primary key to file path & data.
     path: {
       base: "Documentatie",     // Base filepath
-      cur: "Documentatie"       // Init as base
+      cur: ""                   // Inits as base
     },
   },
   content: {
     curFile: 0,                 // Current file id
     sel: ".articleWrapper article", // Article container
-    type: "md"                  // Content file extention
+    type: "md",                 // Content file extention
+    modal: {
+      sel: "#modal-iframe"      // Modal selector
+    },
   },
   nav: {
     sel: "nav",                 // Navigation container
@@ -17,13 +31,14 @@ var p = {
     scope: [],                  // Current navigation scope
     tooltip: false              // Bind tooltip to partitions?
   },
-  modal: {
-    sel: "#modal-iframe"
-  },
-  idleTime: {
-    active: true,               // Active idleTimer
+  reset: {
+    active: true,               // Active resetTimer
     lim: 15,                    // Reset time in minutes
     cur: 0                      // Current idle time in minutes
+  },
+  analytics: {
+    key: "XXX",       // Google analytics key
+    active: true                // Activate analytics
   }
 };
 
@@ -54,43 +69,42 @@ hljs.configure({
 var d3d;
 
 
+/////////////////////
 // On document load
 /////////////////////
 $(document).ready(function() {
-  $(p.nav.sel).height( $(window).height() );
+  p.file.path.cur = p.file.path.base; // Init current path as base path
+  $(p.nav.sel).height( $(window).height() ); // Init nav wrapper height as window height
 
-  $(p.modal.sel).iziModal(iziConfig);
+  $(p.content.modal.sel).iziModal(iziConfig); // Init iziModal
 
-  // Initialise breadcrumbs
+  // Build filelist via Ajax call
   getFileList(p.file.path.base, p.content.type, function(list) {
-    // Make reference arrays global
+    // Build file index and make it global
     p.file.index = buildFileIndex(list);
     // console.log(p.file.index);
 
     // Build the sunburst diagram and make the used data globally available
     d3d = buildSunBurst(list, p.nav.sel);
 
-    // Build breadcrumbs
-    breadcrumbUpdate(p.file.index[0]);
-    // Update article column
-    articleUpdate(p.file.index[0]);
+    breadcrumbUpdate( p.file.index[0] ); // Build breadcrumbs
+    articleUpdate   ( p.file.index[0] ); // Update article column
   });
 
-  idleTimeInit();
+  resetTimerInit();
 });
 
 
-
+//////////////////
 // On modal open
 //////////////////
-$(document).on('opened', p.modal.sel, function (e) {
+$(document).on('opened', p.content.modal.sel, function (e) {
+  // Select the iframe within the modal
   var elem = $(this).children('div').children('div').children('iframe');
-  var url = elem.attr("src")
+  var url = elem.attr("src");
 
-  checkIframeUrl(url, function(d) {
-    d = $.parseJSON(d);
-
-    if (d.error)
+  checkIframeUrl(url, function(d) { // Ajax: Check if url can be loaded in a frame
+    if ($.parseJSON(d).error)       // If it can't be loaded > load fallback page
       elem.attr("src", "ajax/crossOriginError.php?url="+url);
   });
 });
@@ -100,9 +114,9 @@ $(document).on('opened', p.modal.sel, function (e) {
 
 
 
-
+/////////////////////////
 // Navigation functions
-///////////////////////
+/////////////////////////
 // Build the sunburst diagram used for navigation
 function buildSunBurst(list, elem) {
   // Sunburst settings
@@ -111,8 +125,6 @@ function buildSunBurst(list, elem) {
     .chart("partition.arc")
       .value("s")
       // .value("_COUNT_")
-      // .diameter(800)
-      // .zoomable([1, 5])
       .collapsible()
       .duration(500)
       .colors( ['#8dd3c7','#f6f6b3','#bebada','#fb8072','#80b1d3','#fdb462','#b3de69','#fccde5','#d9d9d9','#bc80bd','#ccebc5','#ffed6f'] )
@@ -125,7 +137,7 @@ function buildSunBurst(list, elem) {
   /////////////////////
 
   // Every SVG element
-  $.each($("nav svg g").children(), function(key, val) {
+  $.each($("nav svg > g").children(), function(key, val) {
     elem = $(val);
 
     // Add click event
@@ -255,7 +267,7 @@ function getHTMLFileList(path) {
 
 
 
-
+////////////////////////////
 // File managing functions
 ////////////////////////////
 // The file index links file ID as primary key to file path & data. It's a computed lookup table.
@@ -329,7 +341,7 @@ function getNavScope(index) {
 
 
 
-
+//////////////////////
 // Article functions
 //////////////////////
 // Update the current article
@@ -360,7 +372,7 @@ function articleUpdate(index) {
     // Catch external links to modal
     $("a[href^=http]").click(function(event) {
       event.preventDefault();
-      $(p.modal.sel).iziModal('open', event);
+      $(p.content.modal.sel).iziModal('open', event);
     });
 
     // Catch internal links
@@ -371,7 +383,7 @@ function articleUpdate(index) {
         .replace(/^sunb:/, '')   // Remove identifier prefix
         .replace(/(%20)/g, ' '); // Decode spaces
 
-      // Get file id
+      // Get file id based on path
       $.each(p.file.index, function(key, val) {
         if (p.file.index[key].path == path) {
           // Raise click event based on file id
@@ -379,6 +391,9 @@ function articleUpdate(index) {
         }
       });
     });
+
+    // Trigger pageview
+    analyticsPageview();
   });
 }
 
@@ -413,16 +428,14 @@ function getCode(block, callback) {
 
 // Extend Markdown capabilities
 function extraMarkdown(input) {
-  var index = p.file.index[ p.content.curFile ]
+  var index = p.file.index[ p.content.curFile ];
 
   // Show list of current navScope with links
   var ret = input.replace(/\{filelist\}/g, getHTMLFileList(path));
 
   // Give current articles relative filepath, used to link to images
   var path = index.path.replace(/^\//, "");
-  if (index.obj.isLeaf)
-    path = path.replace(/\/[\w\s\-]+$/g, "");
-
+  if (index.obj.isLeaf) { path = path.replace(/\/[\w\s\-]+$/g, ""); }
   ret = ret.replace(/\{path\}/g, path);
 
   return ret
@@ -434,27 +447,43 @@ function extraMarkdown(input) {
 
 
 
+function analyticsPageview() {
+  if (p.analytics.active) {
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+    (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
 
-// Auto reset functions
-/////////////////////////
-function idleTimeInit() {
-  // Only activate if settings dicate so
-  if (p.idleTime.active) {
-    //Increment the idle time counter every minute.
-    var idleInterval = setInterval(idleTimeIncrement, 60000); // Every minute
-
-    //Zero the idle timer on mouse movement.
-    $(this).mousemove(function (e) { p.idleTime.cur = 0; });
-    $(this).mousedown(function (e) { p.idleTime.cur = 0; });
-    $(this).keypress (function (e) { p.idleTime.cur = 0; });
+    ga('create', p.analytics.key, 'auto');
+    ga('send', 'pageview');
   }
 }
 
-function idleTimeIncrement() {
-  p.idleTime.cur++;
+
+
+
+
+/////////////////////////
+// Auto reset functions
+/////////////////////////
+function resetTimerInit() {
+  // Only activate if settings dicate so
+  if (p.reset.active) {
+    //Increment the idle time counter every minute.
+    var idleInterval = setInterval(resetTimerIncrement, 60000); // Every minute
+
+    //Zero the idle timer on mouse movement.
+    $(this).mousemove(function (e) { p.reset.cur = 0; });
+    $(this).mousedown(function (e) { p.reset.cur = 0; });
+    $(this).keypress (function (e) { p.reset.cur = 0; });
+  }
+}
+
+function resetTimerIncrement() {
+  p.reset.cur++;
   // If time has passed
-  if (p.idleTime.cur >= p.idleTime.lim) {
-    p.idleTime.cur = 0;
+  if (p.reset.cur >= p.reset.lim) {
+    p.reset.cur = 0;
     // If not already showing root
     if (p.file.path.cur != p.file.path.base+"."+p.content.type)
       reset();
@@ -466,6 +495,3 @@ function reset() {
   // Lazy but effective reset
   location.reload();
 }
-
-
-
