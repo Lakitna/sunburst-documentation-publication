@@ -55,6 +55,7 @@ var d3d;
 
 
 // On document load
+/////////////////////
 $(document).ready(function() {
   $(p.nav.sel).height( $(window).height() );
 
@@ -81,6 +82,7 @@ $(document).ready(function() {
 
 
 // On modal open
+//////////////////
 $(document).on('opened', p.modal.sel, function (e) {
   var elem = $(this).children('div').children('div').children('iframe');
   var url = elem.attr("src")
@@ -99,33 +101,8 @@ $(document).on('opened', p.modal.sel, function (e) {
 
 
 
-// Setup functions
-////////////////////
-// The file index links file ID as primary key to file path & data. It's a computed lookup table.
-function buildFileIndex(obj, ret={}, path="") {
-  $.each(obj, function(key, val) {
-    // Only act when an ID is found
-    if (key == 'i') {
-      // Determine file path
-      path += "/"+obj["n"];
-
-      // Build upon return object
-      ret[val] = { 'path': path, "obj": obj };
-
-      // If there is a subfolder
-      if (typeof(obj['children']) == "object") {
-        $.each(obj['children'], function(k, v) {
-          // Calling itself makes things recursive
-          buildFileIndex(obj['children'][k], ret, path);
-        });
-      }
-    }
-  });
-
-  return ret;
-}
-
-
+// Navigation functions
+///////////////////////
 // Build the sunburst diagram used for navigation
 function buildSunBurst(list, elem) {
   // Sunburst settings
@@ -145,8 +122,7 @@ function buildSunBurst(list, elem) {
 
   // Build sunburst
   partition.draw(list);
-
-
+  /////////////////////
 
   // Every SVG element
   $.each($("nav svg g").children(), function(key, val) {
@@ -156,12 +132,10 @@ function buildSunBurst(list, elem) {
     elem.click(function(event) {
       navClickhandler( $(this) );
     });
-
-    // Add tooltip
+    // Add tooltip if applicable
     if (p.nav.tooltip)
       elem.qtip( $.extend(true, qconfig, { content: { attr: qtipContentAttr } } ) );
   });
-
 
   updateSunburst(0);
 
@@ -187,10 +161,9 @@ function updateSunburst(id) {
 
       // Show every label
       elem.attr("style", "display: block");
-
       // Hide specific labels
       if ($.inArray(i, p.nav.scope) < 0) { // If it's not in navScope
-        if (i != id)                    // If it's not the current node
+        if (i != id)                       // If it's not the current node
           elem.attr("style", "display: none");
       }
     }
@@ -198,70 +171,11 @@ function updateSunburst(id) {
 }
 
 
-// Navscope grabs the IDs of files in current and (current+1) depth
-function getNavScope(index) {
-  p.nav.scope = [];
-
-  // Prep path to achieve uniformity
-  var path = index.path;
-  path = path.replace(/^\//, '');
-  path = path.replace(/\/$/, '');
-  path = "/"+ path.replace("."+p.content.type, '') +"/";
-  path = path.replace("/", "\/");
-
-  if (index.obj.isLeaf) // Remove two folders from path
-    path = path.replace(/[\w\s]+\/[\w\s\-]+\/$/g, '');
-
-  // Folder depth
-  var pathNodes = path.split("/").length;
-
-  // Match every relevant file
-  var pattern = new RegExp("^"+path, "");
-
-  $.each(p.file.index, function(key, val) {
-    // Get everything in current folder
-    if ( pattern.test(val['path']) ) {
-      // Count current nodes folder depth
-      var pathSplit = val['path'].split("/");
-
-      // Everything that's not in a subfolder OR
-      // Everything that's no deeper than 1 subfolder if clicked node is a leaf
-      if (pathSplit.length == pathNodes ||
-         (index.obj.isLeaf && pathSplit.length == (pathNodes+1))) {
-
-        // Exclude self-named file
-        if (pathSplit[ pathSplit.length-1 ] != "_"+pathSplit[ pathSplit.length-2 ]) {
-          p.nav.scope.push(key);
-        }
-      }
-    }
-  });
-
-  return p.nav.scope;
-}
-
-
-
-
-
-
-
-
-// Usage functions
-////////////////////
-// Do full reset
-function reset() {
-  // Lazy but effective reset
-  location.reload();
-}
-
-// Function handles click events from the navigation column
+// Function handles click events from the sunburst diagram
 function navClickhandler(elem, raise=false) {
   var id = $(elem).attr("id");
-
   // Get element information from fileIndex
   var node = p.file.index[id];
-
   // Build file path
   var path = node.path +"."+ p.content.type;
 
@@ -270,7 +184,6 @@ function navClickhandler(elem, raise=false) {
     d3d._events["click:path"][0].callback( p.file.index[id]['obj'] );
   }
 
-
   // Update article column
   articleUpdate(p.file.index[id]);
   // Update breadcrumbs in nav column
@@ -278,94 +191,6 @@ function navClickhandler(elem, raise=false) {
   // Update sunburst Labels etc
   updateSunburst(id)
 }
-
-
-// Update the current article
-function articleUpdate(index) {
-  console.log(index.path);
-
-  // Store current file id globally
-  p.content.curFile = index['obj']['i'];
-
-  // Strip exces '/' from path
-  var path = index['path'].replace(/^\//, '');
-
-  // Add file extention to path
-  path += "."+p.content.type;
-
-  // Define current path globally
-  p.file.path.cur = path;
-
-  getMarkDownFile(path, function(ret) {
-    // Replace some keywords
-    ret = extraMarkdown(ret);
-
-    // Show article
-    $(p.content.sel).html(ret);
-
-    // Highlight code
-    $('code').each(function(i, block) {
-      var path = $(block).html();
-
-      if (path.substr(0, 4) == "http") {
-        if (path.length < 200) {
-
-          getCodeFile(path, function(code) {
-            $(block).text(code);
-            hljs.highlightBlock(block);
-          });
-
-        }
-      }
-      else if (path.substr(0,5) == "sunb:") {
-        path = p.file.path.cur.replace(/[\w\s\-\.\_]+$/, '')+path.replace(/^sunb\:/, '');
-
-        getCodeFile(path, function(code) {
-          $(block).text(code);
-          hljs.highlightBlock(block);
-        });
-      }
-      else {
-        hljs.highlightBlock(block);
-      }
-    });
-
-    // Scroll to top
-    window.scrollTo(0, 0);
-
-    // Catch external links to modal
-    $("a[href^=http]").click(function(event) {
-      event.preventDefault();
-
-      $(p.modal.sel).iziModal('open', event);
-      // checkIframeUrl( $(event.target).attr("href"), function(d) {
-      //   console.log(d);
-
-      //   if (d.error)
-      //     $(p.modal.sel).iziModal('open');
-      //   else
-      //     $(p.modal.sel).iziModal('open', event);
-      // });
-    });
-
-    // Catch internal links
-    var link = $("a[href^=sunb]").click(function(event) {
-      event.preventDefault();
-      var path = $(this)
-        .attr("href")             // Get href attribute
-        .replace(/^sunb:/, '')    // Remove identifier prefix
-        .replace(/(%20)/g, " ");  // Decode spaces
-
-      $.each(p.file.index, function(key, val) {
-        if (p.file.index[key].path == path) {
-          navClickhandler($("#"+p.file.index[key].obj.i), true);
-        }
-      });
-    });
-  });
-}
-
-
 
 
 // Build the breadcrumbs
@@ -406,11 +231,13 @@ function breadcrumbUpdate(index) {
 }
 
 
+// Build {filelist}
 function getHTMLFileList(path) {
-  // Build the list in HTML using navScope
+  // Make the list wrapper
   var ul = $("<ul></ul>")
     .addClass('fileList');
 
+  // Build the list items in HTML using navScope
   $.each(p.nav.scope, function(key, id) {
     var li = $("<li></li>")
       .attr("id", id)
@@ -418,10 +245,192 @@ function getHTMLFileList(path) {
       .attr( "onClick", "navClickhandler(this, true)" ) // Oldschool inline event listner :(
       .appendTo(ul);
   });
-  ul = ul.prop('outerHTML');
+  ul = ul.prop('outerHTML'); // Object to raw HTML
 
   return ul;
 }
+
+
+
+
+
+
+
+// File managing functions
+////////////////////////////
+// The file index links file ID as primary key to file path & data. It's a computed lookup table.
+function buildFileIndex(obj, ret={}, path="") {
+  $.each(obj, function(key, val) {
+    // Only act when an ID is found
+    if (key == 'i') {
+      // Determine file path
+      path += "/"+obj["n"];
+
+      // Build upon return object
+      ret[val] = { 'path': path, "obj": obj };
+
+      // If there is a subfolder
+      if (typeof(obj['children']) == "object") {
+        $.each(obj['children'], function(k, v) {
+          // Calling itself makes things recursive
+          buildFileIndex(obj['children'][k], ret, path);
+        });
+      }
+    }
+  });
+
+  return ret;
+}
+
+// Navscope grabs the IDs of files in current and (current+1) depth
+function getNavScope(index) {
+  p.nav.scope = [];
+
+  // Prep path to achieve uniformity
+  var path = index.path;
+  path = path.replace(/^\//, '');
+  path = path.replace(/\/$/, '');
+  path = "/"+ path.replace("."+p.content.type, '') +"/";
+  path = path.replace("/", "\/");
+
+  if (index.obj.isLeaf) // Remove two folders from path
+    path = path.replace(/[\w\s]+\/[\w\s\-]+\/$/g, '');
+
+  // Folder depth
+  var pathNodes = path.split("/").length;
+
+  // Match every relevant file
+  var pattern = new RegExp("^"+path, "");
+
+  $.each(p.file.index, function(key, val) {
+    // Get everything in current folder
+    if ( pattern.test(val['path']) ) {
+      // Count current nodes folder depth
+      var pathSplit = val['path'].split("/");
+
+      // Everything that's not in a subfolder OR
+      // Everything that's no deeper than 1 subfolder if clicked node is a leaf
+      if (pathSplit.length == pathNodes ||
+         (index.obj.isLeaf && pathSplit.length == (pathNodes+1))) {
+
+        // Exclude self-named file
+        if (pathSplit[ pathSplit.length-1 ] != "_"+pathSplit[ pathSplit.length-2 ]) {
+          p.nav.scope.push(key);
+        }
+      }
+    }
+  });
+  return p.nav.scope;
+}
+
+
+
+
+
+
+
+
+// Article functions
+//////////////////////
+// Update the current article
+function articleUpdate(index) {
+  console.log(index.path);                     // Show current path in console
+
+  p.content.curFile = index['obj']['i'];       // Store current file id globally
+  var path = index['path'].replace(/^\//, ''); // Strip exces '/' from path
+  path += "."+p.content.type;                  // Add file extention to path
+  p.file.path.cur = path;                      // Define current path globally
+
+  getMarkDownFile(path, function(ret) {
+    ret = extraMarkdown(ret);   // Add some extra markdown capabilities
+    $(p.content.sel).html(ret); // Show article
+    window.scrollTo(0, 0);      // Scroll to top
+
+    // Highlight code blocks
+    $('code').each(function(i, block) {
+      // Get code from (block content | url | file)
+      getCode(block, function(block) {
+        hljs.highlightBlock( block );
+      });
+    });
+
+    // Restyle links that contain images
+    $("a:has(img)").addClass("img");
+
+    // Catch external links to modal
+    $("a[href^=http]").click(function(event) {
+      event.preventDefault();
+      $(p.modal.sel).iziModal('open', event);
+    });
+
+    // Catch internal links
+    var link = $("a[href^=sunb]").click(function(event) {
+      event.preventDefault();
+      var path = $(this)
+        .attr("href")            // Get href attribute
+        .replace(/^sunb:/, '')   // Remove identifier prefix
+        .replace(/(%20)/g, ' '); // Decode spaces
+
+      // Get file id
+      $.each(p.file.index, function(key, val) {
+        if (p.file.index[key].path == path) {
+          // Raise click event based on file id
+          navClickhandler($("#"+p.file.index[key].obj.i), true);
+        }
+      });
+    });
+  });
+}
+
+
+// Get code from (block content | url | file)
+function getCode(block, callback) {
+  var path = $(block).html();
+
+  if (path.substr(0, 4) == "http") { // If block content starts with http for external links
+    if (path.length < 200) {         // If block only contains a url based on character count
+
+      getCodeFile(path, function(code) { // Ajax call to url
+        $(block).text(code);             // Replace block content with ajax call return
+        callback(block);                 // Fire callback
+      });
+    }
+  }
+  else if (path.substr(0,5) == "sunb:") { // If block content starts with sunb: for internal links
+    // Current folder path + file link
+    path = p.file.path.cur.replace(/[\w\s\-\.\_]+$/, '') + path.replace(/^sunb\:/, '');
+
+    getCodeFile(path, function(code) { // Ajax call to url
+      $(block).text(code);             // Replace block content with ajax call return
+      callback(block);                 // Fire callback
+    });
+  }
+  else { // Else no external file reference
+    callback(block);
+  }
+}
+
+
+// Extend Markdown capabilities
+function extraMarkdown(input) {
+  var index = p.file.index[ p.content.curFile ]
+
+  // Show list of current navScope with links
+  var ret = input.replace(/\{filelist\}/g, getHTMLFileList(path));
+
+  // Give current articles relative filepath, used to link to images
+  var path = index.path.replace(/^\//, "");
+  if (index.obj.isLeaf)
+    path = path.replace(/\/[\w\s\-]+$/g, "");
+
+  ret = ret.replace(/\{path\}/g, path);
+
+  return ret
+}
+
+
+
+
 
 
 
@@ -452,29 +461,11 @@ function idleTimeIncrement() {
   }
 }
 
-
-
-
-
-// Extend Markdown capabilities
-/////////////////////////////////
-function extraMarkdown(input) {
-  var index = p.file.index[ p.content.curFile ]
-
-  // Show list of current navScope with links
-  var ret = input.replace(/\{filelist\}/g, getHTMLFileList(path));
-
-  // Give current articles relative filepath, used to link to images
-  var path = index.path.replace(/^\//, "");
-  if (index.obj.isLeaf)
-    path = path.replace(/\/[\w\s\-]+$/g, "");
-
-  ret = ret.replace(/\{path\}/g, path);
-
-  return ret
+// Do full reset
+function reset() {
+  // Lazy but effective reset
+  location.reload();
 }
-
-
 
 
 
