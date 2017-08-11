@@ -1,15 +1,13 @@
 <?php
-$folder = '../'.$_POST['folder'];
-// $content = '../'.$_POST['content'];
-// $extention = $_POST['ext'];
+$folder = $_POST['folder'];
+$file_extention = $_POST['ext'];
+// $folder = $_GET['folder'];
+// $file_extention = $_GET['ext'];
 
 $i = 1;
 
-$fileData = getFileTree( new DirectoryIterator( $folder ) );
-
-// $fileData = trim(json_encode($fileData), "[]");
-// $fileData = '{"n":"Documentatie","i":0,"children":'.json_encode($fileData).'}';
-$fileData = '{"n":"'.$_POST['folder'].'","i":0,"children":'.json_encode($fileData).'}';
+$fileData = getFileTree( new DirectoryIterator( '../'.$folder ) );
+$fileData = '{"n":"'.$folder.'","i":0,"children":'.json_encode($fileData).'}';
 
 echo $fileData;
 // echo json_encode($fileData);
@@ -17,8 +15,7 @@ echo $fileData;
 
 
 function getFileTree( DirectoryIterator $dir ) {
-	$file_extention = $_POST['ext'];
-	global $i;
+	global $file_extention, $folder, $i;
 
 	$data = array();
 	foreach ( $dir as $node ) {
@@ -34,7 +31,7 @@ function getFileTree( DirectoryIterator $dir ) {
 			$i++;
 		}
 		else if ( $node->isFile() ) {
-			if ($fn != ".DS_Store" && $fn != "_".$_POST['folder']) {
+			if ($fn != ".DS_Store" && $fn != "_".$folder && substr($fn, 0, 1) != "+") {
 				// Exclude non $file_extention filetypes
 				$explode = explode(".", $fn);
 				if (count($explode) == 1) {

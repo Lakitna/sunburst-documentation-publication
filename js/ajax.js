@@ -15,11 +15,11 @@ function getFileList(folder, extention, callback) {
 }
 
 
-function getMarkDownFile(file, callback) {
+function getMarkDownFile(file, footer, callback) {
   $.ajax({
     type: "POST",
     url: "ajax/getMarkDownFile.php",
-    data: { "file": file }
+    data: { "file": file, "footer": footer }
   })
   .done(function(d) {
     // d = $.parseJSON(d);

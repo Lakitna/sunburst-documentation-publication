@@ -2,93 +2,122 @@
 /////////////////////
 // Add permalinks
 // Add history
-//
+// Add max breadcrumb depth
 /////////////////////
 // Written by Lakitna 2017
 // Code released via Github https://github.com/Lakitna/sunburst-documentation-publication
 // MIT License
-//
+/////////////////////
 
+
+/////////////////
+// Preferences //
+/////////////////
 var p = {
   file: {
-    index: {},                  // The file index links file ID as primary key to file path & data.
-    path: {
-      base: "Documentatie",     // Base filepath
-      cur: ""                   // Inits as base
-    },
+    type: "md",                 // Content file extention
+    path: "Content",            // Base filepath
+    footer: {
+      name: "+footer.md",       // Footer filename
+      path: ""                  // Empty for base path
+    }
   },
   content: {
-    curFile: 0,                 // Current file id
     sel: ".articleWrapper article", // Article container
-    type: "md",                 // Content file extention
     modal: {
       sel: "#modal-iframe"      // Modal selector
     },
+    abbr: {
+      show: false,              // Show styling for abbreviations
+      tooltip: {
+        active: false,          // Activate abbreviation tooltips
+        attr: "title"           // Attribute to dictate tooltip content
+      }
+    }
   },
   nav: {
     sel: "nav",                 // Navigation container
-    breadcrumbs: "#breadcrumbs",// Breadcrumbs container
-    scope: [],                  // Current navigation scope
-    tooltip: false              // Bind tooltip to partitions?
+    breadcrumbs: {
+      sel: "#breadcrumbs",      // Breadcrumbs container
+      max: 0                    // Maximum breadcrumb depth. 0 = infinite
+    },
+    tooltip: {
+      active: false,            // Activate sunburst partition tooltips
+      attr: "data-name"         // Attribute to dictate tooltip content
+    }
   },
   reset: {
     active: true,               // Active resetTimer
-    lim: 15,                    // Reset time in minutes
-    cur: 0                      // Current idle time in minutes
+    time: 15                    // Reset time in minutes
   },
   analytics: {
-    key: "XXX",       // Google analytics key
-    active: true                // Activate analytics
+    active: true,               // Activate analytics
+    key: "XXXXXXXXXXXXX"        // Google analytics key
   }
 };
 
-
 //Qtip settings
-var qtipContentAttr = "data-name";
 var qconfig = {
-    show: { delay: 0, solo: true, effect: false },
-    hide: { when: 'mouseout', delay: 50, effect: false },
-    position: { my: 'bottom right', at: 'top left', target: 'mouse' },
+    show: { delay: 0, effect: false },
+    hide: { delay: 0, effect: false },
+    position: { my: 'bottom left', at: 'top right', target: 'mouse' },
     style: { classes: 'qtip-dark' }
   };
 
 //iziModal settings
 var iziConfig = {
-    iframe: true,
-    iframeHeight: $(window).height() * 0.9,
-    width:        $(window).width()  * 0.75,
-    timeout: true
+    iframe: true,                             // Is modal content iFrame
+    iframeHeight: $(window).height() * 0.9,   // Height of modal in px
+    width:        $(window).width()  * 0.75,  // Width of modal in px
+    timeout: true                             // Can it time out?
 }
 
 // Highlight settings
 hljs.configure({
-  tabReplace: '  '
+    tabReplace: '  ' // Replace tabs with x spaces
 })
 
 
-var d3d;
+
+
+// Global vars
+var g = {
+  file: {
+    index: {},                  // The file index links file ID as primary key to file path & data.
+    curPath: p.file.path,       // Current file path, inits as base path
+    curId: 0,                   // Current file id
+  },
+  nav: {
+    scope: []                   // Current navigation scope
+  },
+  reset: {
+    cur: 0                      // Current idle time in minutes
+  },
+  d3d: {}                       // The D3 data object from the sunburst diagram
+};
 
 
 /////////////////////
 // On document load
 /////////////////////
 $(document).ready(function() {
-  p.file.path.cur = p.file.path.base; // Init current path as base path
+  if (p.file.footer.path == "") p.file.footer.path = p.file.path;
+
   $(p.nav.sel).height( $(window).height() ); // Init nav wrapper height as window height
 
   $(p.content.modal.sel).iziModal(iziConfig); // Init iziModal
 
   // Build filelist via Ajax call
-  getFileList(p.file.path.base, p.content.type, function(list) {
+  getFileList(p.file.path, p.file.type, function(list) {
     // Build file index and make it global
-    p.file.index = buildFileIndex(list);
-    // console.log(p.file.index);
+    g.file.index = buildFileIndex(list);
+    // console.log(g.file.index);
 
     // Build the sunburst diagram and make the used data globally available
-    d3d = buildSunBurst(list, p.nav.sel);
+    g.d3d = buildSunBurst(list, p.nav.sel);
 
-    breadcrumbUpdate( p.file.index[0] ); // Build breadcrumbs
-    articleUpdate   ( p.file.index[0] ); // Update article column
+    breadcrumbUpdate( g.file.index[0] ); // Build breadcrumbs
+    articleUpdate   ( g.file.index[0] ); // Update article column
   });
 
   resetTimerInit();
@@ -145,8 +174,10 @@ function buildSunBurst(list, elem) {
       navClickhandler( $(this) );
     });
     // Add tooltip if applicable
-    if (p.nav.tooltip)
-      elem.qtip( $.extend(true, qconfig, { content: { attr: qtipContentAttr } } ) );
+    if (p.nav.tooltip.active) {
+      elem.children(".shape")
+          .qtip( $.extend(true, qconfig, { content: { attr: p.nav.tooltip.attr } } ) );
+    }
   });
 
   updateSunburst(0);
@@ -157,7 +188,7 @@ function buildSunBurst(list, elem) {
 
 // Update the sunburst diagram
 function updateSunburst(id) {
-  getNavScope(p.file.index[id]);
+  getNavScope(g.file.index[id]);
 
   // Every SVG element
   $.each($("nav svg g").children(), function(key, val) {
@@ -174,7 +205,7 @@ function updateSunburst(id) {
       // Show every label
       elem.attr("style", "display: block");
       // Hide specific labels
-      if ($.inArray(i, p.nav.scope) < 0) { // If it's not in navScope
+      if ($.inArray(i, g.nav.scope) < 0) { // If it's not in navScope
         if (i != id)                       // If it's not the current node
           elem.attr("style", "display: none");
       }
@@ -185,21 +216,20 @@ function updateSunburst(id) {
 
 // Function handles click events from the sunburst diagram
 function navClickhandler(elem, raise=false) {
-  var id = $(elem).attr("id");
-  // Get element information from fileIndex
-  var node = p.file.index[id];
-  // Build file path
-  var path = node.path +"."+ p.content.type;
+  if (typeof(elem) == "object")
+    var id = $(elem).attr("id");
+  else
+    var id = elem;
 
   // Raise the D3 click event
   if (raise) {
-    d3d._events["click:path"][0].callback( p.file.index[id]['obj'] );
+    g.d3d._events["click:path"][0].callback( g.file.index[id]['obj'] );
   }
 
   // Update article column
-  articleUpdate(p.file.index[id]);
+  articleUpdate(g.file.index[id]);
   // Update breadcrumbs in nav column
-  breadcrumbUpdate(p.file.index[id]);
+  breadcrumbUpdate(g.file.index[id]);
   // Update sunburst Labels etc
   updateSunburst(id)
 }
@@ -208,10 +238,10 @@ function navClickhandler(elem, raise=false) {
 // Build the breadcrumbs
 function breadcrumbUpdate(index) {
   // Start with clean slate
-  $(p.nav.breadcrumbs).html("");
+  $(p.nav.breadcrumbs.sel).html("");
 
   // Strip exces '/' & file extention from path
-  var path = index['path'].replace("."+p.content.type, '');
+  var path = index['path'].replace("."+p.file.type, '');
   path = path.replace(/^\/|\/$/, '');
 
   // Iterate every folder in path
@@ -230,14 +260,14 @@ function breadcrumbUpdate(index) {
       .attr("id", id)
       .click(function() { navClickhandler(this, true); })
       .text(val.replace(/^-/, ''))
-      .appendTo($(p.nav.breadcrumbs));
+      .appendTo($(p.nav.breadcrumbs.sel));
 
     // Add devider if applicable
     if (key != (list.length-1)) {
       var span = $("<span></span>")
         .addClass('devider')
         .html("&#x25BA;")
-        .appendTo($(p.nav.breadcrumbs))
+        .appendTo($(p.nav.breadcrumbs.sel))
     }
   });
 }
@@ -250,10 +280,10 @@ function getHTMLFileList(path) {
     .addClass('fileList');
 
   // Build the list items in HTML using navScope
-  $.each(p.nav.scope, function(key, id) {
+  $.each(g.nav.scope, function(key, id) {
     var li = $("<li></li>")
       .attr("id", id)
-      .text(p.file.index[id]['obj']['n'].replace(/^\-/, ''))
+      .text(g.file.index[id]['obj']['n'].replace(/^\-/, ''))
       .attr( "onClick", "navClickhandler(this, true)" ) // Oldschool inline event listner :(
       .appendTo(ul);
   });
@@ -296,13 +326,13 @@ function buildFileIndex(obj, ret={}, path="") {
 
 // Navscope grabs the IDs of files in current and (current+1) depth
 function getNavScope(index) {
-  p.nav.scope = [];
+  g.nav.scope = [];
 
   // Prep path to achieve uniformity
   var path = index.path;
   path = path.replace(/^\//, '');
   path = path.replace(/\/$/, '');
-  path = "/"+ path.replace("."+p.content.type, '') +"/";
+  path = "/"+ path.replace("."+p.file.type, '') +"/";
   path = path.replace("/", "\/");
 
   if (index.obj.isLeaf) // Remove two folders from path
@@ -314,7 +344,7 @@ function getNavScope(index) {
   // Match every relevant file
   var pattern = new RegExp("^"+path, "");
 
-  $.each(p.file.index, function(key, val) {
+  $.each(g.file.index, function(key, val) {
     // Get everything in current folder
     if ( pattern.test(val['path']) ) {
       // Count current nodes folder depth
@@ -327,12 +357,12 @@ function getNavScope(index) {
 
         // Exclude self-named file
         if (pathSplit[ pathSplit.length-1 ] != "_"+pathSplit[ pathSplit.length-2 ]) {
-          p.nav.scope.push(key);
+          g.nav.scope.push(key);
         }
       }
     }
   });
-  return p.nav.scope;
+  return g.nav.scope;
 }
 
 
@@ -348,12 +378,12 @@ function getNavScope(index) {
 function articleUpdate(index) {
   console.log(index.path);                     // Show current path in console
 
-  p.content.curFile = index['obj']['i'];       // Store current file id globally
+  g.file.curId = index['obj']['i'];       // Store current file id globally
   var path = index['path'].replace(/^\//, ''); // Strip exces '/' from path
-  path += "."+p.content.type;                  // Add file extention to path
-  p.file.path.cur = path;                      // Define current path globally
+  path += "."+p.file.type;                  // Add file extention to path
+  g.file.curPath = path;                      // Define current path globally
 
-  getMarkDownFile(path, function(ret) {
+  getMarkDownFile(path, p.file.footer.path +"/"+ p.file.footer.name, function(ret) {
     ret = extraMarkdown(ret);   // Add some extra markdown capabilities
     $(p.content.sel).html(ret); // Show article
     window.scrollTo(0, 0);      // Scroll to top
@@ -384,13 +414,19 @@ function articleUpdate(index) {
         .replace(/(%20)/g, ' '); // Decode spaces
 
       // Get file id based on path
-      $.each(p.file.index, function(key, val) {
-        if (p.file.index[key].path == path) {
+      $.each(g.file.index, function(key, val) {
+        if (g.file.index[key].path == path) {
           // Raise click event based on file id
-          navClickhandler($("#"+p.file.index[key].obj.i), true);
+          navClickhandler($("#"+g.file.index[key].obj.i), true);
         }
       });
     });
+
+    // Handle abbreviations according to preferences
+    if (!p.content.abbr.show)
+      $("abbr").addClass("plain").attr("title", "");
+    if (p.content.abbr.tooltip.active)
+      $("abbr[title]").qtip( $.extend(true, qconfig, { content: { attr: p.content.abbr.tooltip.attr } } ) );
 
     // Trigger pageview
     analyticsPageview();
@@ -413,7 +449,7 @@ function getCode(block, callback) {
   }
   else if (path.substr(0,5) == "sunb:") { // If block content starts with sunb: for internal links
     // Current folder path + file link
-    path = p.file.path.cur.replace(/[\w\s\-\.\_]+$/, '') + path.replace(/^sunb\:/, '');
+    path = g.file.curPath.replace(/[\w\s\-\.\_]+$/, '') + path.replace(/^sunb\:/, '');
 
     getCodeFile(path, function(code) { // Ajax call to url
       $(block).text(code);             // Replace block content with ajax call return
@@ -428,7 +464,7 @@ function getCode(block, callback) {
 
 // Extend Markdown capabilities
 function extraMarkdown(input) {
-  var index = p.file.index[ p.content.curFile ];
+  var index = g.file.index[ g.file.curId ];
 
   // Show list of current navScope with links
   var ret = input.replace(/\{filelist\}/g, getHTMLFileList(path));
@@ -473,25 +509,24 @@ function resetTimerInit() {
     var idleInterval = setInterval(resetTimerIncrement, 60000); // Every minute
 
     //Zero the idle timer on mouse movement.
-    $(this).mousemove(function (e) { p.reset.cur = 0; });
-    $(this).mousedown(function (e) { p.reset.cur = 0; });
-    $(this).keypress (function (e) { p.reset.cur = 0; });
+    $(this).mousemove(function (e) { g.reset.cur = 0; });
+    $(this).mousedown(function (e) { g.reset.cur = 0; });
+    $(this).keypress (function (e) { g.reset.cur = 0; });
   }
 }
 
 function resetTimerIncrement() {
-  p.reset.cur++;
+  g.reset.cur++;
   // If time has passed
-  if (p.reset.cur >= p.reset.lim) {
-    p.reset.cur = 0;
+  if (g.reset.cur >= p.reset.time) {
+    g.reset.cur = 0;
     // If not already showing root
-    if (p.file.path.cur != p.file.path.base+"."+p.content.type)
+    if (g.file.curPath != p.file.path+"."+p.file.type)
       reset();
   }
 }
 
 // Do full reset
 function reset() {
-  // Lazy but effective reset
-  location.reload();
+  navClickhandler(0, true);
 }
