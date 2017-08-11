@@ -10,6 +10,7 @@ Using a sunburst diagram to navigate hierarchal articles.
 * [D3.js](https://d3js.org/)
 	* [D3.chart](http://misoproject.com/d3-chart/)
 * [Highlight.js](https://highlightjs.org/)
-* [Parsedown](http://parsedown.org/)
+* [Markdown Extra](https://github.com/michelf/php-markdown/)
+* [SmartyPants Typographer](https://github.com/michelf/php-smartypants)
 
 The sunburst diagram is an edit of [d3.chart.layout.hierarchy](https://github.com/bansaghi/d3.chart.layout.hierarchy/)
